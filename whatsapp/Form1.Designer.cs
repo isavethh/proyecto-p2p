@@ -10,18 +10,18 @@
 
         private Label lblConnectionStatus;
         private NumericUpDown numLocalPort;
-        private NumericUpDown numRemotePort;
-        private TextBox txtRemoteIP;
         private TextBox txtEncryptionKey;
 
         private Button btnStartListener;
         private Button btnStopListener;
         private Button btnSendMessage;
         private Button btnToggleTheme;
+        private Button btnNewChat;
 
         private TextBox txtChatMessages;
         private TextBox txtMessageInput;
         private TextBox txtTechnicalLog;
+        private ListBox lstChats;
 
         private void InitializeComponent()
         {
@@ -128,58 +128,35 @@
 
             Label lblConfig = new Label
             {
-                Text = "CONFIGURACIÓN",
+                Text = "CHATS",
                 ForeColor = Color.FromArgb(6, 182, 112),
                 Font = new Font("Segoe UI", 10, FontStyle.Bold),
                 Location = new Point(15, 15),
                 AutoSize = true
             };
 
-            Label lblIP = new Label
+            btnNewChat = new Button
             {
-                Text = "IP Destino:",
-                ForeColor = Color.LightGray,
-                Location = new Point(15, 50)
-            };
-
-            txtRemoteIP = new TextBox
-            {
-                Location = new Point(15, 70),
-                Width = 250,
-                Text = "127.0.0.1",
-                BackColor = Color.FromArgb(37, 47, 53),
+                Text = "Crear nuevo chat",
+                Location = new Point(15, 45),
+                Size = new Size(250, 35),
+                BackColor = Color.FromArgb(6, 182, 112),
                 ForeColor = Color.White,
-                BorderStyle = BorderStyle.FixedSingle
+                FlatStyle = FlatStyle.Flat,
+                Font = new Font("Segoe UI", 9, FontStyle.Bold)
             };
-
-            Label lblPort = new Label
-            {
-                Text = "Puerto:",
-                ForeColor = Color.LightGray,
-                Location = new Point(15, 110)
-            };
-
-            numRemotePort = new NumericUpDown
-            {
-                Location = new Point(15, 130),
-                Width = 250,
-                Minimum = 1024,
-                Maximum = 65535,
-                Value = 5001,
-                BackColor = Color.FromArgb(37, 47, 53),
-                ForeColor = Color.White
-            };
+            btnNewChat.Click += BtnNewChat_Click;
 
             Label lblKey = new Label
             {
                 Text = "Clave:",
                 ForeColor = Color.LightGray,
-                Location = new Point(15, 170)
+                Location = new Point(15, 95)
             };
 
             txtEncryptionKey = new TextBox
             {
-                Location = new Point(15, 190),
+                Location = new Point(15, 115),
                 Width = 250,
                 Text = "SharedKey123",
                 BackColor = Color.FromArgb(37, 47, 53),
@@ -187,13 +164,22 @@
                 BorderStyle = BorderStyle.FixedSingle
             };
 
+            lstChats = new ListBox
+            {
+                Location = new Point(15, 155),
+                Size = new Size(250, 520),
+                BackColor = Color.FromArgb(37, 47, 53),
+                ForeColor = Color.White,
+                BorderStyle = BorderStyle.FixedSingle,
+                Font = new Font("Segoe UI", 9)
+            };
+            lstChats.SelectedIndexChanged += LstChats_SelectedIndexChanged;
+
             pnlSidebar.Controls.Add(lblConfig);
-            pnlSidebar.Controls.Add(lblIP);
-            pnlSidebar.Controls.Add(txtRemoteIP);
-            pnlSidebar.Controls.Add(lblPort);
-            pnlSidebar.Controls.Add(numRemotePort);
+            pnlSidebar.Controls.Add(btnNewChat);
             pnlSidebar.Controls.Add(lblKey);
             pnlSidebar.Controls.Add(txtEncryptionKey);
+            pnlSidebar.Controls.Add(lstChats);
 
             // ================= CHAT =================
             pnlChatContainer = new Panel
@@ -236,6 +222,7 @@
                 ForeColor = Color.White,
                 FlatStyle = FlatStyle.Flat
             };
+            btnSendMessage.Click += BtnSendMessage_Click;
 
             pnlInputContainer.Controls.Add(txtMessageInput);
             pnlInputContainer.Controls.Add(btnSendMessage);

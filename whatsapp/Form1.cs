@@ -2,9 +2,23 @@ namespace whatsapp
 {
     public partial class Form1 : Form
     {
+        private sealed class ChatInfo
+        {
+            public required string Name { get; init; }
+            public required string RemoteIP { get; init; }
+            public required int RemotePort { get; init; }
+
+            public override string ToString()
+            {
+                return $"{Name} ({RemoteIP}:{RemotePort})";
+            }
+        }
+
         private P2PNode _p2pNode;
         private bool _isNodeStarted;
         private bool _isDarkMode = true; // Modo oscuro por defecto
+        private readonly List<ChatInfo> _chats = [];
+        private ChatInfo? _activeChat;
 
         // Colores Modo Oscuro
         private readonly Color DarkBg = Color.FromArgb(17, 27, 33);
@@ -96,36 +110,129 @@ namespace whatsapp
                     return;
                 }
 
+                if (_activeChat is null)
+                {
+                    MessageBox.Show("Debes crear y seleccionar un chat", "Validación");
+                    return;
+                }
+
                 if (string.IsNullOrWhiteSpace(txtMessageInput.Text))
                 {
                     return;
                 }
 
-                if (string.IsNullOrWhiteSpace(txtRemoteIP.Text))
-                {
-                    MessageBox.Show("Debes ingresar la IP destino", "Validación");
-                    return;
-                }
-
-                string remoteIP = txtRemoteIP.Text;
                 string message = txtMessageInput.Text;
                 string timestamp = DateTime.Now.ToString("HH:mm");
 
                 // Mostrar en chat con formato mejorado
                 this.Invoke(() =>
                 {
-                    txtChatMessages.AppendText($"[{timestamp}] Tú:\r\n{message}\r\n\r\n");
+                    txtChatMessages.AppendText($"[{timestamp}] Tú ({_activeChat.Name}):\r\n{message}\r\n\r\n");
                     txtMessageInput.Clear();
                     txtMessageInput.Focus();
                 });
 
                 // Enviar en background
-                _ = _p2pNode.SendMessage(remoteIP, (int)numRemotePort.Value, message);
+                _ = _p2pNode.SendMessage(_activeChat.RemoteIP, _activeChat.RemotePort, message);
             }
             catch (Exception ex)
             {
                 MessageBox.Show($"Error al enviar mensaje: {ex.Message}", "Error");
             }
+        }
+
+        private void BtnNewChat_Click(object sender, EventArgs e)
+        {
+            if (!TryShowNewChatDialog(out string chatName, out string remoteIp, out int remotePort))
+            {
+                return;
+            }
+
+            var chat = new ChatInfo
+            {
+                Name = chatName,
+                RemoteIP = remoteIp,
+                RemotePort = remotePort
+            };
+
+            _chats.Add(chat);
+            lstChats.Items.Add(chat);
+            lstChats.SelectedItem = chat;
+        }
+
+        private void LstChats_SelectedIndexChanged(object sender, EventArgs e)
+        {
+            _activeChat = lstChats.SelectedItem as ChatInfo;
+        }
+
+        private bool TryShowNewChatDialog(out string chatName, out string remoteIp, out int remotePort)
+        {
+            chatName = string.Empty;
+            remoteIp = string.Empty;
+            remotePort = 0;
+
+            using Form dialog = new()
+            {
+                Text = "Crear nuevo chat",
+                StartPosition = FormStartPosition.CenterParent,
+                FormBorderStyle = FormBorderStyle.FixedDialog,
+                MaximizeBox = false,
+                MinimizeBox = false,
+                ClientSize = new Size(320, 210)
+            };
+
+            Label lblName = new() { Left = 15, Top = 15, Width = 290, Text = "Nombre del chat:" };
+            TextBox txtName = new() { Left = 15, Top = 35, Width = 290 };
+
+            Label lblIp = new() { Left = 15, Top = 70, Width = 290, Text = "IP destino:" };
+            TextBox txtIp = new() { Left = 15, Top = 90, Width = 290, Text = "127.0.0.1" };
+
+            Label lblPort = new() { Left = 15, Top = 125, Width = 290, Text = "Puerto destino:" };
+            NumericUpDown numPort = new()
+            {
+                Left = 15,
+                Top = 145,
+                Width = 290,
+                Minimum = 1024,
+                Maximum = 65535,
+                Value = 5001
+            };
+
+            Button btnOk = new() { Text = "Crear", Left = 145, Top = 178, Width = 75, DialogResult = DialogResult.OK };
+            Button btnCancel = new() { Text = "Cancelar", Left = 230, Top = 178, Width = 75, DialogResult = DialogResult.Cancel };
+
+            dialog.Controls.Add(lblName);
+            dialog.Controls.Add(txtName);
+            dialog.Controls.Add(lblIp);
+            dialog.Controls.Add(txtIp);
+            dialog.Controls.Add(lblPort);
+            dialog.Controls.Add(numPort);
+            dialog.Controls.Add(btnOk);
+            dialog.Controls.Add(btnCancel);
+            dialog.AcceptButton = btnOk;
+            dialog.CancelButton = btnCancel;
+
+            if (dialog.ShowDialog(this) != DialogResult.OK)
+            {
+                return false;
+            }
+
+            if (string.IsNullOrWhiteSpace(txtName.Text))
+            {
+                MessageBox.Show("Debes ingresar un nombre para el chat", "Validación");
+                return false;
+            }
+
+            if (!System.Net.IPAddress.TryParse(txtIp.Text.Trim(), out _))
+            {
+                MessageBox.Show("La IP destino no es válida", "Validación");
+                return false;
+            }
+
+            chatName = txtName.Text.Trim();
+            remoteIp = txtIp.Text.Trim();
+            remotePort = (int)numPort.Value;
+            return true;
         }
 
         private void P2PNode_MessageReceived(string message, byte[] encryptedBytes)
@@ -227,6 +334,11 @@ namespace whatsapp
                 numericUpDown.BackColor = Color.FromArgb(37, 47, 53);
                 numericUpDown.ForeColor = DarkText;
             }
+            else if (ctrl is ListBox listBox)
+            {
+                listBox.BackColor = Color.FromArgb(37, 47, 53);
+                listBox.ForeColor = DarkText;
+            }
             else if (ctrl is Panel panel)
             {
                 panel.BackColor = Color.FromArgb(17, 27, 33);
@@ -260,6 +372,11 @@ namespace whatsapp
             {
                 numericUpDown.BackColor = LightTextBg;
                 numericUpDown.ForeColor = LightText;
+            }
+            else if (ctrl is ListBox listBox)
+            {
+                listBox.BackColor = LightTextBg;
+                listBox.ForeColor = LightText;
             }
             else if (ctrl is Panel panel)
             {
