@@ -69,5 +69,15 @@ namespace whatsapp.Properties {
                 return ((System.Drawing.Bitmap)(obj));
             }
         }
+        
+        /// <summary>
+        ///   Busca un recurso adaptado de tipo System.Drawing.Bitmap.
+        /// </summary>
+        internal static System.Drawing.Bitmap imagen_2026_03_20_162045954_removebg_preview {
+            get {
+                object obj = ResourceManager.GetObject("imagen_2026-03-20_162045954-removebg-preview", resourceCulture);
+                return ((System.Drawing.Bitmap)(obj));
+            }
+        }
     }
 }

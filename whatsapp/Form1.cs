@@ -210,6 +210,60 @@ namespace whatsapp
             _activeChat = lstChats.SelectedItem as ChatInfo;
         }
 
+        private void LstChats_DrawItem(object? sender, DrawItemEventArgs e)
+        {
+            if (e.Index < 0 || e.Index >= lstChats.Items.Count)
+            {
+                return;
+            }
+
+            e.Graphics.SmoothingMode = System.Drawing.Drawing2D.SmoothingMode.AntiAlias;
+
+            var chat = (ChatInfo)lstChats.Items[e.Index];
+            bool isSelected = (e.State & DrawItemState.Selected) == DrawItemState.Selected;
+
+            Color cardColor = _isDarkMode
+                ? (isSelected ? Color.FromArgb(88, 101, 242) : Color.FromArgb(54, 57, 63))
+                : (isSelected ? Color.FromArgb(88, 101, 242) : Color.FromArgb(225, 229, 236));
+
+            Color titleColor = isSelected
+                ? Color.White
+                : (_isDarkMode ? Color.White : Color.FromArgb(32, 34, 37));
+
+            Color subtitleColor = isSelected
+                ? Color.FromArgb(226, 230, 255)
+                : (_isDarkMode ? Color.FromArgb(180, 186, 198) : Color.FromArgb(106, 114, 128));
+
+            Rectangle cardRect = new(e.Bounds.X + 6, e.Bounds.Y + 4, e.Bounds.Width - 12, e.Bounds.Height - 8);
+
+            using (var path = new System.Drawing.Drawing2D.GraphicsPath())
+            {
+                int radius = 10;
+                int diameter = radius * 2;
+                path.AddArc(cardRect.X, cardRect.Y, diameter, diameter, 180, 90);
+                path.AddArc(cardRect.Right - diameter, cardRect.Y, diameter, diameter, 270, 90);
+                path.AddArc(cardRect.Right - diameter, cardRect.Bottom - diameter, diameter, diameter, 0, 90);
+                path.AddArc(cardRect.X, cardRect.Bottom - diameter, diameter, diameter, 90, 90);
+                path.CloseFigure();
+
+                using var cardBrush = new SolidBrush(cardColor);
+                e.Graphics.FillPath(cardBrush, path);
+            }
+
+            string title = chat.Name;
+            string subtitle = $"{chat.RemoteIP}:{chat.RemotePort}";
+
+            using var titleBrush = new SolidBrush(titleColor);
+            using var subtitleBrush = new SolidBrush(subtitleColor);
+            using var titleFont = new Font("Segoe UI", 10, FontStyle.Bold);
+            using var subtitleFont = new Font("Segoe UI", 8.5f, FontStyle.Regular);
+
+            e.Graphics.DrawString(title, titleFont, titleBrush, cardRect.X + 12, cardRect.Y + 8);
+            e.Graphics.DrawString(subtitle, subtitleFont, subtitleBrush, cardRect.X + 12, cardRect.Y + 30);
+
+            e.DrawFocusRectangle();
+        }
+
         private bool TryShowNewChatDialog(out string chatName, out string remoteIp, out int remotePort)
         {
             chatName = string.Empty;
@@ -429,13 +483,15 @@ namespace whatsapp
         private void ApplyDarkTheme()
         {
             BackColor = DarkBg;
-            btnToggleTheme.Text = "☀️";
+            btnToggleTheme.Text = "Modo claro ☀️";
             btnToggleTheme.BackColor = Color.FromArgb(43, 45, 49);
 
             foreach (Control ctrl in Controls)
             {
                 ApplyDarkThemeRecursive(ctrl);
             }
+
+            lstChats.Invalidate();
 
             btnSendMessage.BackColor = DarkBorder;
             btnNewChat.BackColor = Color.FromArgb(64, 68, 75);
@@ -446,13 +502,15 @@ namespace whatsapp
         private void ApplyLightTheme()
         {
             BackColor = LightBg;
-            btnToggleTheme.Text = "🌙";
+            btnToggleTheme.Text = "Modo oscuro 🌙";
             btnToggleTheme.BackColor = Color.FromArgb(230, 232, 236);
 
             foreach (Control ctrl in Controls)
             {
                 ApplyLightThemeRecursive(ctrl);
             }
+
+            lstChats.Invalidate();
 
             btnSendMessage.BackColor = Color.FromArgb(88, 101, 242);
             btnNewChat.BackColor = Color.FromArgb(220, 224, 230);
@@ -462,6 +520,11 @@ namespace whatsapp
 
         private void ApplyDarkThemeRecursive(Control ctrl)
         {
+            if (ctrl != txtChatMessages && IsInsideChatMessages(ctrl))
+            {
+                return;
+            }
+
             if (ctrl == pnlServerRail)
             {
                 ctrl.BackColor = Color.FromArgb(30, 31, 34);
@@ -521,6 +584,11 @@ namespace whatsapp
 
         private void ApplyLightThemeRecursive(Control ctrl)
         {
+            if (ctrl != txtChatMessages && IsInsideChatMessages(ctrl))
+            {
+                return;
+            }
+
             if (ctrl == pnlServerRail)
             {
                 ctrl.BackColor = Color.FromArgb(231, 234, 238);
@@ -609,6 +677,21 @@ namespace whatsapp
             path.CloseFigure();
 
             control.Region = new Region(path);
+        }
+
+        private bool IsInsideChatMessages(Control control)
+        {
+            Control? current = control.Parent;
+            while (current != null)
+            {
+                if (current == txtChatMessages)
+                {
+                    return true;
+                }
+                current = current.Parent;
+            }
+
+            return false;
         }
     }
 }

@@ -152,14 +152,15 @@
 
             btnToggleTheme = new Button
             {
-                Text = "🌙",
-                Location = new Point(1380, 10),
-                Size = new Size(90, 36),
+                Text = "Modo claro ☀️",
+                Location = new Point(742, 13),
+                Size = new Size(150, 30),
                 BackColor = Color.FromArgb(43, 45, 49),
                 ForeColor = Color.White,
                 FlatStyle = FlatStyle.Flat,
                 Font = new Font("Segoe UI", 10, FontStyle.Bold),
-                TextAlign = ContentAlignment.MiddleCenter
+                TextAlign = ContentAlignment.MiddleCenter,
+                Anchor = AnchorStyles.Top | AnchorStyles.Left
             };
             btnToggleTheme.FlatAppearance.BorderSize = 0;
             btnToggleTheme.Click += BtnToggleTheme_Click;
@@ -231,9 +232,13 @@
                 BackColor = Color.FromArgb(43, 45, 49),
                 ForeColor = Color.White,
                 BorderStyle = BorderStyle.None,
-                Font = new Font("Segoe UI", 10)
+                Font = new Font("Segoe UI", 10),
+                DrawMode = DrawMode.OwnerDrawFixed,
+                ItemHeight = 54,
+                IntegralHeight = false
             };
             lstChats.SelectedIndexChanged += LstChats_SelectedIndexChanged;
+            lstChats.DrawItem += LstChats_DrawItem;
 
             pnlSidebar.Controls.Add(lblConfig);
             pnlSidebar.Controls.Add(btnNewChat);

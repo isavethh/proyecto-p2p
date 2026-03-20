@@ -6,18 +6,25 @@ namespace whatsapp
         {
             Text = "FBIchat";
             StartPosition = FormStartPosition.CenterScreen;
-            ClientSize = new Size(920, 560);
+            ClientSize = new Size(920, 740);
             FormBorderStyle = FormBorderStyle.FixedSingle;
             MaximizeBox = false;
             MinimizeBox = false;
             BackColor = Color.FromArgb(49, 51, 56);
 
-            var backgroundPictureBox = new PictureBox
+            try
             {
-                Dock = DockStyle.Fill,
-                Image = Properties.Resources.abstract_smooth_speed_wave_lines_isolated_for_banner_template_background_png,
-                SizeMode = PictureBoxSizeMode.StretchImage
-            };
+                var background = Properties.Resources.abstract_smooth_speed_wave_lines_isolated_for_banner_template_background_png;
+                if (background != null)
+                {
+                    BackgroundImage = background;
+                    BackgroundImageLayout = ImageLayout.Stretch;
+                }
+            }
+            catch
+            {
+                // Ignorar en diseñador si el recurso no está disponible.
+            }
 
             var mainPanel = new Panel
             {
@@ -28,7 +35,7 @@ namespace whatsapp
 
             var card = new Panel
             {
-                Size = new Size(760, 420),
+                Size = new Size(760, 620),
                 BackColor = Color.FromArgb(56, 58, 64)
             };
 
@@ -64,6 +71,22 @@ namespace whatsapp
                 ForeColor = Color.FromArgb(185, 187, 190),
                 Font = new Font("Segoe UI", 11, FontStyle.Regular)
             };
+
+            var catsPicture = new PictureBox
+            {
+                Dock = DockStyle.Top,
+                Height = 190,
+                BackColor = Color.Transparent,
+                SizeMode = PictureBoxSizeMode.Zoom
+            };
+            try
+            {
+                catsPicture.Image = Properties.Resources.imagen_2026_03_20_162045954_removebg_preview;
+            }
+            catch
+            {
+                // Ignorar en diseñador si el recurso aún no existe.
+            }
 
             var usernameLabel = new Label
             {
@@ -130,6 +153,7 @@ namespace whatsapp
             card.Controls.Add(buttonPanel);
             card.Controls.Add(footerLabel);
             card.Controls.Add(usernameLabel);
+            card.Controls.Add(catsPicture);
             card.Controls.Add(subtitleLabel);
             card.Controls.Add(titleLabel);
             card.Controls.Add(iconLabel);
@@ -141,8 +165,7 @@ namespace whatsapp
                 card.Top = (mainPanel.ClientSize.Height - card.Height) / 2;
             };
 
-            backgroundPictureBox.Controls.Add(mainPanel);
-            Controls.Add(backgroundPictureBox);
+            Controls.Add(mainPanel);
         }
 
         private void ChatButton_Click(string username)
