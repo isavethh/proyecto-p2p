@@ -20,7 +20,7 @@
         private Button btnToggleTheme;
         private Button btnNewChat;
 
-        private FlowLayoutPanel pnlChatMessages;
+        private FlowLayoutPanel txtChatMessages;
         private TextBox txtMessageInput;
         private TextBox txtTechnicalLog;
         private ListBox lstChats;
@@ -31,7 +31,7 @@
 
             // FORM
             this.ClientSize = new Size(1500, 820);
-            this.Text = "Chat P2P Seguro";
+            this.Text = "FBIchat";
             this.BackColor = Color.FromArgb(49, 51, 56);
             this.StartPosition = FormStartPosition.CenterScreen;
 
@@ -249,16 +249,16 @@
                 Padding = new Padding(0)
             };
 
-            pnlChatMessages = new FlowLayoutPanel
+            txtChatMessages = new FlowLayoutPanel
             {
                 Dock = DockStyle.Fill,
                 AutoScroll = true,
                 BackColor = Color.FromArgb(49, 51, 56),
-                Padding = new Padding(20, 20, 20, 40),
+                Padding = new Padding(16, 16, 16, 20),
                 FlowDirection = FlowDirection.TopDown,
                 WrapContents = false
             };
-            pnlChatMessages.Resize += PnlChatMessages_Resize;
+            txtChatMessages.Resize += TxtChatMessages_Resize;
 
             pnlInputContainer = new Panel
             {
@@ -302,7 +302,7 @@
             pnlInputContainer.Controls.Add(pnlMessageInputShell);
             pnlInputContainer.Controls.Add(btnSendMessage);
 
-            pnlChatContainer.Controls.Add(pnlChatMessages);
+            pnlChatContainer.Controls.Add(txtChatMessages);
             pnlChatContainer.Controls.Add(pnlInputContainer);
 
             // ================= LOG =================

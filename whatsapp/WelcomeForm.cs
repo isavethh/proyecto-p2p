@@ -4,7 +4,7 @@ namespace whatsapp
     {
         public WelcomeForm()
         {
-            Text = "NexoChat P2P";
+            Text = "FBIchat";
             StartPosition = FormStartPosition.CenterScreen;
             ClientSize = new Size(920, 560);
             FormBorderStyle = FormBorderStyle.FixedSingle;
@@ -45,7 +45,7 @@ namespace whatsapp
 
             var titleLabel = new Label
             {
-                Text = "NexoChat • Mensajería instantánea",
+                Text = "FBIchat • Mensajería instantánea",
                 AutoSize = false,
                 Dock = DockStyle.Top,
                 Height = 70,
@@ -65,6 +65,28 @@ namespace whatsapp
                 Font = new Font("Segoe UI", 11, FontStyle.Regular)
             };
 
+            var usernameLabel = new Label
+            {
+                Text = "Nombre de usuario",
+                AutoSize = false,
+                Dock = DockStyle.Top,
+                Height = 28,
+                TextAlign = ContentAlignment.BottomCenter,
+                ForeColor = Color.FromArgb(200, 205, 212),
+                Font = new Font("Segoe UI", 10, FontStyle.Bold)
+            };
+
+            var usernameTextBox = new TextBox
+            {
+                Width = 320,
+                Height = 34,
+                Font = new Font("Segoe UI", 11, FontStyle.Regular),
+                BackColor = Color.FromArgb(67, 70, 78),
+                ForeColor = Color.White,
+                BorderStyle = BorderStyle.FixedSingle,
+                TextAlign = HorizontalAlignment.Center,
+                Text = Environment.UserName
+            };
 
             var chatButton = new Button
             {
@@ -78,17 +100,20 @@ namespace whatsapp
                 Anchor = AnchorStyles.None
             };
             chatButton.FlatAppearance.BorderSize = 0;
-            chatButton.Click += ChatButton_Click;
+            chatButton.Click += (_, _) => ChatButton_Click(usernameTextBox.Text);
 
             var buttonPanel = new Panel
             {
                 Dock = DockStyle.Fill
             };
+            buttonPanel.Controls.Add(usernameTextBox);
             buttonPanel.Controls.Add(chatButton);
             buttonPanel.Resize += (_, _) =>
             {
+                usernameTextBox.Left = (buttonPanel.ClientSize.Width - usernameTextBox.Width) / 2;
+                usernameTextBox.Top = Math.Max((buttonPanel.ClientSize.Height - chatButton.Height) / 2 - 56, 10);
                 chatButton.Left = (buttonPanel.ClientSize.Width - chatButton.Width) / 2;
-                chatButton.Top = (buttonPanel.ClientSize.Height - chatButton.Height) / 2;
+                chatButton.Top = usernameTextBox.Bottom + 14;
             };
 
             var footerLabel = new Label
@@ -104,6 +129,7 @@ namespace whatsapp
 
             card.Controls.Add(buttonPanel);
             card.Controls.Add(footerLabel);
+            card.Controls.Add(usernameLabel);
             card.Controls.Add(subtitleLabel);
             card.Controls.Add(titleLabel);
             card.Controls.Add(iconLabel);
@@ -119,10 +145,11 @@ namespace whatsapp
             Controls.Add(backgroundPictureBox);
         }
 
-        private void ChatButton_Click(object? sender, EventArgs e)
+        private void ChatButton_Click(string username)
         {
+            string finalUsername = string.IsNullOrWhiteSpace(username) ? "Usuario" : username.Trim();
             Hide();
-            using var chatForm = new Form1();
+            using var chatForm = new Form1(finalUsername);
             chatForm.ShowDialog(this);
             Close();
         }

@@ -2,12 +2,10 @@ namespace whatsapp
 {
     public partial class Form1 : Form
     {
-        private sealed class ChatMessage
+        private sealed class WireMessage
         {
-            public required string Sender { get; init; }
-            public required string Text { get; init; }
-            public required string Timestamp { get; init; }
-            public required bool IsOwnMessage { get; init; }
+            public string? Sender { get; init; }
+            public string? Text { get; init; }
         }
 
         private sealed class ChatInfo
@@ -15,11 +13,18 @@ namespace whatsapp
             public required string Name { get; init; }
             public required string RemoteIP { get; init; }
             public required int RemotePort { get; init; }
-            public List<ChatMessage> Messages { get; } = [];
 
             public override string ToString()
             {
                 return $"{Name} ({RemoteIP}:{RemotePort})";
+            }
+        }
+
+        private void TxtChatMessages_Resize(object? sender, EventArgs e)
+        {
+            foreach (Control control in txtChatMessages.Controls)
+            {
+                control.Width = Math.Max(txtChatMessages.ClientSize.Width - 32, 100);
             }
         }
 
@@ -28,6 +33,7 @@ namespace whatsapp
         private bool _isDarkMode = true; // Modo oscuro por defecto
         private readonly List<ChatInfo> _chats = [];
         private ChatInfo? _activeChat;
+        private readonly string _localUsername;
 
         // Colores Modo Oscuro
         private readonly Color DarkBg = Color.FromArgb(49, 51, 56);
@@ -41,10 +47,15 @@ namespace whatsapp
         private readonly Color LightText = Color.FromArgb(32, 34, 37);
         private readonly Color LightBorder = Color.FromArgb(200, 200, 200);
 
-        public Form1()
+        public Form1() : this("Tú")
+        {
+        }
+
+        public Form1(string username)
         {
             InitializeComponent();
             _isNodeStarted = false;
+            _localUsername = string.IsNullOrWhiteSpace(username) ? "Tú" : username.Trim();
             ApplyDarkTheme(); // Aplicar tema oscuro al iniciar
             ApplyRoundedStyles();
             Load += (_, _) => ApplyRoundedStyles();
@@ -69,14 +80,6 @@ namespace whatsapp
                     numLocalPort.Value--;
                 }
                 e.Handled = true;
-            }
-        }
-
-        private void PnlChatMessages_Resize(object? sender, EventArgs e)
-        {
-            foreach (Control c in pnlChatMessages.Controls)
-            {
-                c.Width = pnlChatMessages.ClientSize.Width - 40;
             }
         }
 
@@ -168,21 +171,14 @@ namespace whatsapp
                 // Mostrar en chat con formato mejorado
                 this.Invoke(() =>
                 {
-                    var chatMsg = new ChatMessage 
-                    { 
-                        Sender = $"Tú ({_activeChat.Name})", 
-                        Text = message, 
-                        Timestamp = timestamp, 
-                        IsOwnMessage = true 
-                    };
-                    _activeChat.Messages.Add(chatMsg);
-                    AppendMessageBubble(chatMsg.Sender, chatMsg.Text, chatMsg.Timestamp, chatMsg.IsOwnMessage);
+                    AppendMessageBubble($"{_localUsername} ({_activeChat.Name})", message, timestamp, true);
                     txtMessageInput.Clear();
                     txtMessageInput.Focus();
                 });
 
                 // Enviar en background
-                _ = _p2pNode.SendMessage(_activeChat.RemoteIP, _activeChat.RemotePort, message);
+                string wireMessage = SerializeWireMessage(_localUsername, message);
+                _ = _p2pNode.SendMessage(_activeChat.RemoteIP, _activeChat.RemotePort, wireMessage);
             }
             catch (Exception ex)
             {
@@ -212,20 +208,6 @@ namespace whatsapp
         private void LstChats_SelectedIndexChanged(object sender, EventArgs e)
         {
             _activeChat = lstChats.SelectedItem as ChatInfo;
-
-            pnlChatMessages.SuspendLayout();
-            pnlChatMessages.Controls.Clear();
-
-            if (_activeChat != null)
-            {
-                foreach (var msg in _activeChat.Messages)
-                {
-                    AppendMessageBubble(msg.Sender, msg.Text, msg.Timestamp, msg.IsOwnMessage);
-                }
-            }
-
-            pnlChatMessages.ResumeLayout(true);
-            pnlChatMessages.ScrollControlIntoView(pnlChatMessages.Controls.Count > 0 ? pnlChatMessages.Controls[pnlChatMessages.Controls.Count - 1] : null);
         }
 
         private bool TryShowNewChatDialog(out string chatName, out string remoteIp, out int remotePort)
@@ -303,109 +285,109 @@ namespace whatsapp
             this.Invoke(() =>
             {
                 string timestamp = DateTime.Now.ToString("HH:mm");
-                var chatMsg = new ChatMessage 
-                { 
-                    Sender = "Contacto", 
-                    Text = message, 
-                    Timestamp = timestamp, 
-                    IsOwnMessage = false 
-                };
-
-                ChatInfo targetChat = _activeChat;
-
-                // Si no hay chat activo, intenta agregar al primero de la lista
-                if (targetChat == null && _chats.Count > 0)
-                    targetChat = _chats[0];
-
-                if (targetChat != null)
-                {
-                    targetChat.Messages.Add(chatMsg);
-
-                    // Solo renderizar si el chat al que llegó es el que se está mostrando
-                    if (_activeChat == targetChat)
-                    {
-                        AppendMessageBubble(chatMsg.Sender, chatMsg.Text, chatMsg.Timestamp, chatMsg.IsOwnMessage);
-                    }
-                }
+                ParseWireMessage(message, out string senderName, out string messageText);
+                AppendMessageBubble(senderName, messageText, timestamp, false);
             });
+        }
+
+        private static string SerializeWireMessage(string sender, string text)
+        {
+            var payload = new WireMessage { Sender = sender, Text = text };
+            return System.Text.Json.JsonSerializer.Serialize(payload);
+        }
+
+        private static void ParseWireMessage(string rawMessage, out string sender, out string text)
+        {
+            sender = "Contacto";
+            text = rawMessage;
+
+            try
+            {
+                WireMessage? parsed = System.Text.Json.JsonSerializer.Deserialize<WireMessage>(rawMessage);
+                if (!string.IsNullOrWhiteSpace(parsed?.Text))
+                {
+                    text = parsed.Text;
+                    sender = string.IsNullOrWhiteSpace(parsed.Sender) ? "Contacto" : parsed.Sender;
+                }
+            }
+            catch
+            {
+                // Compatibilidad con nodos antiguos que envían solo texto plano.
+            }
         }
 
         private void AppendMessageBubble(string sender, string message, string timestamp, bool isOwnMessage)
         {
             var bubbleBgColor = isOwnMessage
-                ? Color.FromArgb(88, 101, 242)      // Azul moderno para propios
-                : Color.FromArgb(64, 68, 75);       // Gris oscuro para contacto
+                ? Color.FromArgb(88, 101, 242)
+                : (_isDarkMode ? Color.FromArgb(64, 68, 75) : Color.FromArgb(220, 224, 230));
 
-            var foreColor = Color.White;
-            var headerColor = Color.FromArgb(185, 187, 190);
+            var bubbleTextColor = isOwnMessage
+                ? Color.White
+                : (_isDarkMode ? Color.White : Color.FromArgb(32, 34, 37));
 
-            if (!_isDarkMode)
+            var headerColor = _isDarkMode
+                ? Color.FromArgb(185, 187, 190)
+                : Color.FromArgb(110, 115, 125);
+
+            Panel wrapper = new()
             {
-                bubbleBgColor = isOwnMessage ? Color.FromArgb(88, 101, 242) : Color.FromArgb(220, 224, 230);
-                foreColor = isOwnMessage ? Color.White : Color.FromArgb(32, 34, 37);
-                headerColor = Color.Gray;
-            }
-
-            Panel msgWrapper = new Panel
-            {
-                Width = pnlChatMessages.ClientSize.Width - 40,
-                AutoSize = false,
-                Margin = new Padding(0, 0, 0, 15)
+                Width = Math.Max(txtChatMessages.ClientSize.Width - 32, 100),
+                Height = 1,
+                Margin = new Padding(0, 0, 0, 12)
             };
 
-            Label lblHeader = new Label
+            Label headerLabel = new()
             {
                 Text = $"{sender} • {timestamp}",
                 AutoSize = true,
                 ForeColor = headerColor,
+                BackColor = Color.Transparent,
                 Font = new Font("Segoe UI", 8.5f, FontStyle.Regular),
                 Top = 0
             };
 
-            Label lblMessage = new Label
+            Label bubbleLabel = new()
             {
                 Text = message,
                 AutoSize = true,
-                MaximumSize = new Size((int)(msgWrapper.Width * 0.7), 0),
+                MaximumSize = new Size((int)(wrapper.Width * 0.72f), 0),
+                MinimumSize = new Size(90, 0),
                 BackColor = bubbleBgColor,
-                ForeColor = foreColor,
-                Font = new Font("Segoe UI", 10.5f, FontStyle.Regular),
-                Padding = new Padding(12, 10, 12, 10)
+                ForeColor = bubbleTextColor,
+                Font = new Font("Segoe UI", 10f, FontStyle.Regular),
+                Padding = new Padding(12, 9, 12, 9),
+                Top = 22
             };
 
-            lblMessage.Top = 20; // below header
-
-            Action alignControls = () =>
+            void AlignBubble()
             {
-                lblMessage.MaximumSize = new Size((int)(msgWrapper.Width * 0.7), 0);
+                bubbleLabel.MaximumSize = new Size((int)(wrapper.Width * 0.72f), 0);
+
                 if (isOwnMessage)
                 {
-                    lblHeader.Left = msgWrapper.Width - lblHeader.PreferredWidth;
-                    lblMessage.Left = msgWrapper.Width - lblMessage.PreferredWidth;
+                    headerLabel.Left = wrapper.Width - headerLabel.PreferredWidth;
+                    bubbleLabel.Left = wrapper.Width - bubbleLabel.Width;
                 }
                 else
                 {
-                    lblHeader.Left = 0;
-                    lblMessage.Left = 0;
+                    headerLabel.Left = 0;
+                    bubbleLabel.Left = 0;
                 }
-                msgWrapper.Height = lblMessage.Bottom + 5;
-            };
 
-            lblMessage.SizeChanged += (s, e) => 
-            {
-                alignControls();
-                RoundControl(lblMessage, 12);
-            };
+                wrapper.Height = bubbleLabel.Bottom + 2;
+                RoundControl(bubbleLabel, 14);
+            }
 
-            msgWrapper.Resize += (s, e) => alignControls();
+            bubbleLabel.SizeChanged += (_, _) => AlignBubble();
+            wrapper.Resize += (_, _) => AlignBubble();
 
-            msgWrapper.Controls.Add(lblHeader);
-            msgWrapper.Controls.Add(lblMessage);
+            wrapper.Controls.Add(headerLabel);
+            wrapper.Controls.Add(bubbleLabel);
+            AlignBubble();
 
-            alignControls(); // Forzar alineación inicial antes de agregar al contenedor
-
-            pnlChatMessages.Controls.Add(msgWrapper);
-            pnlChatMessages.ScrollControlIntoView(msgWrapper);
+            txtChatMessages.Controls.Add(wrapper);
+            txtChatMessages.ScrollControlIntoView(wrapper);
         }
 
         private void P2PNode_LogMessage(string logMessage)
@@ -488,7 +470,7 @@ namespace whatsapp
             {
                 ctrl.BackColor = Color.FromArgb(43, 45, 49);
             }
-            else if (ctrl == pnlHeader || ctrl == pnlChatContainer || ctrl == pnlInputContainer || ctrl == pnlChatMessages)
+            else if (ctrl == pnlHeader || ctrl == pnlChatContainer || ctrl == pnlInputContainer)
             {
                 ctrl.BackColor = Color.FromArgb(49, 51, 56);
             }
@@ -521,10 +503,9 @@ namespace whatsapp
                 listBox.BackColor = Color.FromArgb(43, 45, 49);
                 listBox.ForeColor = DarkText;
             }
-            else if (ctrl is RichTextBox richTextBox)
+            else if (ctrl is FlowLayoutPanel flowPanel && flowPanel == txtChatMessages)
             {
-                richTextBox.BackColor = Color.FromArgb(49, 51, 56);
-                richTextBox.ForeColor = DarkText;
+                flowPanel.BackColor = Color.FromArgb(49, 51, 56);
             }
             else if (ctrl is Panel panel)
             {
@@ -548,7 +529,7 @@ namespace whatsapp
             {
                 ctrl.BackColor = Color.FromArgb(236, 239, 244);
             }
-            else if (ctrl == pnlHeader || ctrl == pnlChatContainer || ctrl == pnlInputContainer || ctrl == pnlChatMessages)
+            else if (ctrl == pnlHeader || ctrl == pnlChatContainer || ctrl == pnlInputContainer)
             {
                 ctrl.BackColor = LightBg;
             }
@@ -581,10 +562,9 @@ namespace whatsapp
                 listBox.BackColor = Color.FromArgb(236, 239, 244);
                 listBox.ForeColor = LightText;
             }
-            else if (ctrl is RichTextBox richTextBox)
+            else if (ctrl is FlowLayoutPanel flowPanel && flowPanel == txtChatMessages)
             {
-                richTextBox.BackColor = LightTextBg;
-                richTextBox.ForeColor = LightText;
+                flowPanel.BackColor = LightBg;
             }
             else if (ctrl is Panel panel)
             {
@@ -608,7 +588,7 @@ namespace whatsapp
             RoundControl(txtEncryptionKey, 8);
             RoundControl(numLocalPort, 8);
             RoundControl(pnlInputContainer, 14);
-            RoundControl(pnlChatMessages, 10);
+            RoundControl(txtChatMessages, 10);
             RoundControl(lstChats, 10);
         }
 
