@@ -2,11 +2,20 @@ namespace whatsapp
 {
     public partial class Form1 : Form
     {
+        private sealed class ChatMessage
+        {
+            public required string Sender { get; init; }
+            public required string Text { get; init; }
+            public required string Timestamp { get; init; }
+            public required bool IsOwnMessage { get; init; }
+        }
+
         private sealed class ChatInfo
         {
             public required string Name { get; init; }
             public required string RemoteIP { get; init; }
             public required int RemotePort { get; init; }
+            public List<ChatMessage> Messages { get; } = [];
 
             public override string ToString()
             {
@@ -21,15 +30,15 @@ namespace whatsapp
         private ChatInfo? _activeChat;
 
         // Colores Modo Oscuro
-        private readonly Color DarkBg = Color.FromArgb(17, 27, 33);
-        private readonly Color DarkTextBg = Color.FromArgb(30, 40, 50);
+        private readonly Color DarkBg = Color.FromArgb(49, 51, 56);
+        private readonly Color DarkTextBg = Color.FromArgb(56, 58, 64);
         private readonly Color DarkText = Color.White;
-        private readonly Color DarkBorder = Color.FromArgb(100, 150, 200);
+        private readonly Color DarkBorder = Color.FromArgb(88, 101, 242);
 
         // Colores Modo Claro
-        private readonly Color LightBg = Color.FromArgb(240, 240, 245);
+        private readonly Color LightBg = Color.FromArgb(245, 246, 250);
         private readonly Color LightTextBg = Color.White;
-        private readonly Color LightText = Color.Black;
+        private readonly Color LightText = Color.FromArgb(32, 34, 37);
         private readonly Color LightBorder = Color.FromArgb(200, 200, 200);
 
         public Form1()
@@ -37,6 +46,38 @@ namespace whatsapp
             InitializeComponent();
             _isNodeStarted = false;
             ApplyDarkTheme(); // Aplicar tema oscuro al iniciar
+            ApplyRoundedStyles();
+            Load += (_, _) => ApplyRoundedStyles();
+            Shown += (_, _) => ApplyRoundedStyles();
+            Resize += (_, _) => ApplyRoundedStyles();
+        }
+
+        private void NumLocalPort_KeyDown(object sender, KeyEventArgs e)
+        {
+            if (e.KeyCode == Keys.Up)
+            {
+                if (numLocalPort.Value < numLocalPort.Maximum)
+                {
+                    numLocalPort.Value++;
+                }
+                e.Handled = true;
+            }
+            else if (e.KeyCode == Keys.Down)
+            {
+                if (numLocalPort.Value > numLocalPort.Minimum)
+                {
+                    numLocalPort.Value--;
+                }
+                e.Handled = true;
+            }
+        }
+
+        private void PnlChatMessages_Resize(object? sender, EventArgs e)
+        {
+            foreach (Control c in pnlChatMessages.Controls)
+            {
+                c.Width = pnlChatMessages.ClientSize.Width - 40;
+            }
         }
 
         private void BtnStartListener_Click(object sender, EventArgs e)
@@ -127,7 +168,15 @@ namespace whatsapp
                 // Mostrar en chat con formato mejorado
                 this.Invoke(() =>
                 {
-                    txtChatMessages.AppendText($"[{timestamp}] Tú ({_activeChat.Name}):\r\n{message}\r\n\r\n");
+                    var chatMsg = new ChatMessage 
+                    { 
+                        Sender = $"Tú ({_activeChat.Name})", 
+                        Text = message, 
+                        Timestamp = timestamp, 
+                        IsOwnMessage = true 
+                    };
+                    _activeChat.Messages.Add(chatMsg);
+                    AppendMessageBubble(chatMsg.Sender, chatMsg.Text, chatMsg.Timestamp, chatMsg.IsOwnMessage);
                     txtMessageInput.Clear();
                     txtMessageInput.Focus();
                 });
@@ -163,6 +212,20 @@ namespace whatsapp
         private void LstChats_SelectedIndexChanged(object sender, EventArgs e)
         {
             _activeChat = lstChats.SelectedItem as ChatInfo;
+
+            pnlChatMessages.SuspendLayout();
+            pnlChatMessages.Controls.Clear();
+
+            if (_activeChat != null)
+            {
+                foreach (var msg in _activeChat.Messages)
+                {
+                    AppendMessageBubble(msg.Sender, msg.Text, msg.Timestamp, msg.IsOwnMessage);
+                }
+            }
+
+            pnlChatMessages.ResumeLayout(true);
+            pnlChatMessages.ScrollControlIntoView(pnlChatMessages.Controls.Count > 0 ? pnlChatMessages.Controls[pnlChatMessages.Controls.Count - 1] : null);
         }
 
         private bool TryShowNewChatDialog(out string chatName, out string remoteIp, out int remotePort)
@@ -240,8 +303,109 @@ namespace whatsapp
             this.Invoke(() =>
             {
                 string timestamp = DateTime.Now.ToString("HH:mm");
-                txtChatMessages.AppendText($"[{timestamp}] Contacto:\r\n{message}\r\n\r\n");
+                var chatMsg = new ChatMessage 
+                { 
+                    Sender = "Contacto", 
+                    Text = message, 
+                    Timestamp = timestamp, 
+                    IsOwnMessage = false 
+                };
+
+                ChatInfo targetChat = _activeChat;
+
+                // Si no hay chat activo, intenta agregar al primero de la lista
+                if (targetChat == null && _chats.Count > 0)
+                    targetChat = _chats[0];
+
+                if (targetChat != null)
+                {
+                    targetChat.Messages.Add(chatMsg);
+
+                    // Solo renderizar si el chat al que llegó es el que se está mostrando
+                    if (_activeChat == targetChat)
+                    {
+                        AppendMessageBubble(chatMsg.Sender, chatMsg.Text, chatMsg.Timestamp, chatMsg.IsOwnMessage);
+                    }
+                }
             });
+        }
+
+        private void AppendMessageBubble(string sender, string message, string timestamp, bool isOwnMessage)
+        {
+            var bubbleBgColor = isOwnMessage
+                ? Color.FromArgb(88, 101, 242)      // Azul moderno para propios
+                : Color.FromArgb(64, 68, 75);       // Gris oscuro para contacto
+
+            var foreColor = Color.White;
+            var headerColor = Color.FromArgb(185, 187, 190);
+
+            if (!_isDarkMode)
+            {
+                bubbleBgColor = isOwnMessage ? Color.FromArgb(88, 101, 242) : Color.FromArgb(220, 224, 230);
+                foreColor = isOwnMessage ? Color.White : Color.FromArgb(32, 34, 37);
+                headerColor = Color.Gray;
+            }
+
+            Panel msgWrapper = new Panel
+            {
+                Width = pnlChatMessages.ClientSize.Width - 40,
+                AutoSize = false,
+                Margin = new Padding(0, 0, 0, 15)
+            };
+
+            Label lblHeader = new Label
+            {
+                Text = $"{sender} • {timestamp}",
+                AutoSize = true,
+                ForeColor = headerColor,
+                Font = new Font("Segoe UI", 8.5f, FontStyle.Regular),
+                Top = 0
+            };
+
+            Label lblMessage = new Label
+            {
+                Text = message,
+                AutoSize = true,
+                MaximumSize = new Size((int)(msgWrapper.Width * 0.7), 0),
+                BackColor = bubbleBgColor,
+                ForeColor = foreColor,
+                Font = new Font("Segoe UI", 10.5f, FontStyle.Regular),
+                Padding = new Padding(12, 10, 12, 10)
+            };
+
+            lblMessage.Top = 20; // below header
+
+            Action alignControls = () =>
+            {
+                lblMessage.MaximumSize = new Size((int)(msgWrapper.Width * 0.7), 0);
+                if (isOwnMessage)
+                {
+                    lblHeader.Left = msgWrapper.Width - lblHeader.PreferredWidth;
+                    lblMessage.Left = msgWrapper.Width - lblMessage.PreferredWidth;
+                }
+                else
+                {
+                    lblHeader.Left = 0;
+                    lblMessage.Left = 0;
+                }
+                msgWrapper.Height = lblMessage.Bottom + 5;
+            };
+
+            lblMessage.SizeChanged += (s, e) => 
+            {
+                alignControls();
+                RoundControl(lblMessage, 12);
+            };
+
+            msgWrapper.Resize += (s, e) => alignControls();
+
+            msgWrapper.Controls.Add(lblHeader);
+            msgWrapper.Controls.Add(lblMessage);
+
+            alignControls(); // Forzar alineación inicial antes de agregar al contenedor
+
+            pnlChatMessages.Controls.Add(msgWrapper);
+            pnlChatMessages.ScrollControlIntoView(msgWrapper);
         }
 
         private void P2PNode_LogMessage(string logMessage)
@@ -282,66 +446,89 @@ namespace whatsapp
 
         private void ApplyDarkTheme()
         {
-            // Form
             BackColor = DarkBg;
-
-            // Botón toggle
             btnToggleTheme.Text = "☀️";
-            btnToggleTheme.BackColor = Color.FromArgb(37, 47, 53);
+            btnToggleTheme.BackColor = Color.FromArgb(43, 45, 49);
 
-            // Paneles principales
             foreach (Control ctrl in Controls)
             {
                 ApplyDarkThemeRecursive(ctrl);
             }
+
+            btnSendMessage.BackColor = DarkBorder;
+            btnNewChat.BackColor = Color.FromArgb(64, 68, 75);
+            btnStartListener.BackColor = Color.FromArgb(35, 165, 90);
+            btnStopListener.BackColor = Color.FromArgb(237, 66, 69);
         }
 
         private void ApplyLightTheme()
         {
-            // Form
             BackColor = LightBg;
-
-            // Botón toggle
             btnToggleTheme.Text = "🌙";
-            btnToggleTheme.BackColor = Color.FromArgb(220, 220, 220);
+            btnToggleTheme.BackColor = Color.FromArgb(230, 232, 236);
 
-            // Paneles principales
             foreach (Control ctrl in Controls)
             {
                 ApplyLightThemeRecursive(ctrl);
             }
+
+            btnSendMessage.BackColor = Color.FromArgb(88, 101, 242);
+            btnNewChat.BackColor = Color.FromArgb(220, 224, 230);
+            btnStartListener.BackColor = Color.FromArgb(35, 165, 90);
+            btnStopListener.BackColor = Color.FromArgb(237, 66, 69);
         }
 
         private void ApplyDarkThemeRecursive(Control ctrl)
         {
+            if (ctrl == pnlServerRail)
+            {
+                ctrl.BackColor = Color.FromArgb(30, 31, 34);
+            }
+            else if (ctrl == pnlSidebar || ctrl == pnlLog)
+            {
+                ctrl.BackColor = Color.FromArgb(43, 45, 49);
+            }
+            else if (ctrl == pnlHeader || ctrl == pnlChatContainer || ctrl == pnlInputContainer || ctrl == pnlChatMessages)
+            {
+                ctrl.BackColor = Color.FromArgb(49, 51, 56);
+            }
+            else if (ctrl == pnlMessageInputShell)
+            {
+                ctrl.BackColor = DarkTextBg;
+            }
             if (ctrl is TextBox textBox && textBox != txtMessageInput)
             {
-                textBox.BackColor = DarkTextBg;
+                textBox.BackColor = textBox == txtTechnicalLog ? Color.FromArgb(30, 31, 34) : Color.FromArgb(49, 51, 56);
                 textBox.ForeColor = DarkText;
             }
             else if (ctrl is TextBox messageBox && messageBox == txtMessageInput)
             {
-                messageBox.BackColor = Color.FromArgb(37, 47, 53);
+                messageBox.BackColor = DarkTextBg;
                 messageBox.ForeColor = DarkText;
             }
             else if (ctrl is Label label && label != lblConnectionStatus)
             {
                 label.BackColor = Color.Transparent;
-                label.ForeColor = DarkText;
+                label.ForeColor = Color.FromArgb(185, 187, 190);
             }
             else if (ctrl is NumericUpDown numericUpDown)
             {
-                numericUpDown.BackColor = Color.FromArgb(37, 47, 53);
+                numericUpDown.BackColor = Color.FromArgb(56, 58, 64);
                 numericUpDown.ForeColor = DarkText;
             }
             else if (ctrl is ListBox listBox)
             {
-                listBox.BackColor = Color.FromArgb(37, 47, 53);
+                listBox.BackColor = Color.FromArgb(43, 45, 49);
                 listBox.ForeColor = DarkText;
+            }
+            else if (ctrl is RichTextBox richTextBox)
+            {
+                richTextBox.BackColor = Color.FromArgb(49, 51, 56);
+                richTextBox.ForeColor = DarkText;
             }
             else if (ctrl is Panel panel)
             {
-                panel.BackColor = Color.FromArgb(17, 27, 33);
+                panel.BackColor = panel.BackColor;
             }
 
             // Aplicar recursivamente a controles hijos
@@ -353,14 +540,30 @@ namespace whatsapp
 
         private void ApplyLightThemeRecursive(Control ctrl)
         {
+            if (ctrl == pnlServerRail)
+            {
+                ctrl.BackColor = Color.FromArgb(231, 234, 238);
+            }
+            else if (ctrl == pnlSidebar || ctrl == pnlLog)
+            {
+                ctrl.BackColor = Color.FromArgb(236, 239, 244);
+            }
+            else if (ctrl == pnlHeader || ctrl == pnlChatContainer || ctrl == pnlInputContainer || ctrl == pnlChatMessages)
+            {
+                ctrl.BackColor = LightBg;
+            }
+            else if (ctrl == pnlMessageInputShell)
+            {
+                ctrl.BackColor = Color.FromArgb(229, 233, 240);
+            }
             if (ctrl is TextBox textBox && textBox != txtMessageInput)
             {
-                textBox.BackColor = LightTextBg;
+                textBox.BackColor = textBox == txtTechnicalLog ? Color.FromArgb(229, 233, 240) : LightTextBg;
                 textBox.ForeColor = LightText;
             }
             else if (ctrl is TextBox messageBox && messageBox == txtMessageInput)
             {
-                messageBox.BackColor = Color.FromArgb(240, 240, 245);
+                messageBox.BackColor = Color.FromArgb(229, 233, 240);
                 messageBox.ForeColor = LightText;
             }
             else if (ctrl is Label label && label != lblConnectionStatus)
@@ -370,17 +573,22 @@ namespace whatsapp
             }
             else if (ctrl is NumericUpDown numericUpDown)
             {
-                numericUpDown.BackColor = LightTextBg;
+                numericUpDown.BackColor = Color.FromArgb(229, 233, 240);
                 numericUpDown.ForeColor = LightText;
             }
             else if (ctrl is ListBox listBox)
             {
-                listBox.BackColor = LightTextBg;
+                listBox.BackColor = Color.FromArgb(236, 239, 244);
                 listBox.ForeColor = LightText;
+            }
+            else if (ctrl is RichTextBox richTextBox)
+            {
+                richTextBox.BackColor = LightTextBg;
+                richTextBox.ForeColor = LightText;
             }
             else if (ctrl is Panel panel)
             {
-                panel.BackColor = LightBg;
+                panel.BackColor = panel.BackColor;
             }
 
             // Aplicar recursivamente a controles hijos
@@ -388,6 +596,39 @@ namespace whatsapp
             {
                 ApplyLightThemeRecursive(child);
             }
+        }
+
+        private void ApplyRoundedStyles()
+        {
+            RoundControl(btnSendMessage, 12);
+            RoundControl(btnNewChat, 10);
+            RoundControl(btnStartListener, 10);
+            RoundControl(btnStopListener, 10);
+            RoundControl(btnToggleTheme, 10);
+            RoundControl(txtEncryptionKey, 8);
+            RoundControl(numLocalPort, 8);
+            RoundControl(pnlInputContainer, 14);
+            RoundControl(pnlChatMessages, 10);
+            RoundControl(lstChats, 10);
+        }
+
+        private static void RoundControl(Control control, int radius)
+        {
+            if (control.Width <= 0 || control.Height <= 0)
+            {
+                return;
+            }
+
+            using var path = new System.Drawing.Drawing2D.GraphicsPath();
+            int diameter = radius * 2;
+
+            path.AddArc(0, 0, diameter, diameter, 180, 90);
+            path.AddArc(control.Width - diameter, 0, diameter, diameter, 270, 90);
+            path.AddArc(control.Width - diameter, control.Height - diameter, diameter, diameter, 0, 90);
+            path.AddArc(0, control.Height - diameter, diameter, diameter, 90, 90);
+            path.CloseFigure();
+
+            control.Region = new Region(path);
         }
     }
 }
