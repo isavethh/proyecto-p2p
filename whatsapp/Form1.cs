@@ -8,6 +8,14 @@ namespace whatsapp
             public string? Text { get; init; }
         }
 
+        private sealed class ChatMessage
+        {
+            public required string Sender { get; init; }
+            public required string Text { get; init; }
+            public required string Timestamp { get; init; }
+            public required bool IsOwnMessage { get; init; }
+        }
+
         private sealed class ChatInfo
         {
             public required string Name { get; init; }
@@ -32,6 +40,7 @@ namespace whatsapp
         private bool _isNodeStarted;
         private bool _isDarkMode = true; // Modo oscuro por defecto
         private readonly List<ChatInfo> _chats = [];
+        private readonly Dictionary<string, List<ChatMessage>> _chatHistory = new(StringComparer.OrdinalIgnoreCase);
         private ChatInfo? _activeChat;
         private readonly string _localUsername;
 
@@ -168,15 +177,27 @@ namespace whatsapp
                 string message = txtMessageInput.Text;
                 string timestamp = DateTime.Now.ToString("HH:mm");
 
-                // Mostrar en chat con formato mejorado
+                AddMessageToChat(
+                    _activeChat,
+                    new ChatMessage
+                    {
+                        Sender = _localUsername,
+                        Text = message,
+                        Timestamp = timestamp,
+                        IsOwnMessage = true
+                    });
+
                 this.Invoke(() =>
                 {
-                    AppendMessageBubble($"{_localUsername} ({_activeChat.Name})", message, timestamp, true);
+                    if (_activeChat != null)
+                    {
+                        RenderChatMessages(_activeChat);
+                    }
+
                     txtMessageInput.Clear();
                     txtMessageInput.Focus();
                 });
 
-                // Enviar en background
                 string wireMessage = SerializeWireMessage(_localUsername, message);
                 _ = _p2pNode.SendMessage(_activeChat.RemoteIP, _activeChat.RemotePort, wireMessage);
             }
@@ -202,12 +223,22 @@ namespace whatsapp
 
             _chats.Add(chat);
             lstChats.Items.Add(chat);
+            EnsureChatHistory(chat);
             lstChats.SelectedItem = chat;
         }
 
         private void LstChats_SelectedIndexChanged(object sender, EventArgs e)
         {
             _activeChat = lstChats.SelectedItem as ChatInfo;
+
+            if (_activeChat != null)
+            {
+                RenderChatMessages(_activeChat);
+            }
+            else
+            {
+                txtChatMessages.Controls.Clear();
+            }
         }
 
         private void LstChats_DrawItem(object? sender, DrawItemEventArgs e)
@@ -340,7 +371,27 @@ namespace whatsapp
             {
                 string timestamp = DateTime.Now.ToString("HH:mm");
                 ParseWireMessage(message, out string senderName, out string messageText);
-                AppendMessageBubble(senderName, messageText, timestamp, false);
+
+                ChatInfo? targetChat = FindChatByInboundMessage();
+                if (targetChat is null)
+                {
+                    return;
+                }
+
+                AddMessageToChat(
+                    targetChat,
+                    new ChatMessage
+                    {
+                        Sender = senderName,
+                        Text = messageText,
+                        Timestamp = timestamp,
+                        IsOwnMessage = false
+                    });
+
+                if (_activeChat == targetChat)
+                {
+                    RenderChatMessages(targetChat);
+                }
             });
         }
 
@@ -692,6 +743,55 @@ namespace whatsapp
             }
 
             return false;
+        }
+
+        private string GetChatKey(ChatInfo chat)
+        {
+            return $"{chat.RemoteIP}:{chat.RemotePort}";
+        }
+
+        private void EnsureChatHistory(ChatInfo chat)
+        {
+            string key = GetChatKey(chat);
+            if (!_chatHistory.ContainsKey(key))
+            {
+                _chatHistory[key] = [];
+            }
+        }
+
+        private void AddMessageToChat(ChatInfo chat, ChatMessage message)
+        {
+            EnsureChatHistory(chat);
+            _chatHistory[GetChatKey(chat)].Add(message);
+        }
+
+        private void RenderChatMessages(ChatInfo chat)
+        {
+            EnsureChatHistory(chat);
+            txtChatMessages.SuspendLayout();
+            txtChatMessages.Controls.Clear();
+
+            foreach (ChatMessage message in _chatHistory[GetChatKey(chat)])
+            {
+                AppendMessageBubble(message.Sender, message.Text, message.Timestamp, message.IsOwnMessage);
+            }
+
+            txtChatMessages.ResumeLayout();
+        }
+
+        private ChatInfo? FindChatByInboundMessage()
+        {
+            if (_activeChat != null)
+            {
+                return _activeChat;
+            }
+
+            if (_chats.Count > 0)
+            {
+                return _chats[0];
+            }
+
+            return null;
         }
     }
 }
